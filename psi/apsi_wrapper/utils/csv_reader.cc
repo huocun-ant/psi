@@ -17,6 +17,8 @@
 
 #include "psi/apsi_wrapper/utils/csv_reader.h"
 
+#include <apsi/item.h>
+
 #include "fmt/format.h"
 #include "fmt/ranges.h"
 
@@ -27,6 +29,7 @@
 #include <cctype>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <sstream>
 #include <type_traits>
 #include <unordered_map>
@@ -75,7 +78,8 @@ std::vector<std::string> GetCsvColumnNames(const std::string& filename) {
   return column_names;
 }
 
-ApsiCsvReader::ApsiCsvReader(const string& file_name) : file_name_(file_name) {
+ApsiCsvReader::ApsiCsvReader(const string& file_name, size_t batch_size)
+    : file_name_(file_name), batch_size_(batch_size) {
   throw_if_file_invalid(file_name_);
 
   std::vector<std::string> column_names = GetCsvColumnNames(file_name_);
@@ -83,8 +87,17 @@ ApsiCsvReader::ApsiCsvReader(const string& file_name) : file_name_(file_name) {
   for (auto& col : column_names) {
     column_types_[col] = arrow::utf8();
   }
-
   reader_ = MakeArrowCsvReader(file_name_, column_names);
+
+  std::vector<std::string> keys{"key"};
+  std::vector<std::string> values{"value"};
+  if (column_names.size() == 1) {
+    batch_provider_ =
+        std::make_shared<ArrowCsvBatchProvider>(file_name_, keys, batch_size_);
+  } else {
+    batch_provider_ = std::make_shared<ArrowCsvBatchProvider>(
+        file_name_, keys, batch_size_, values);
+  }
 }
 
 std::shared_ptr<arrow::Schema> ApsiCsvReader::schema() const {
@@ -96,56 +109,25 @@ auto ApsiCsvReader::read() -> pair<DBData, vector<string>> {
 
   DBData result;
   vector<string> orig_items;
-  std::shared_ptr<arrow::RecordBatch> batch;
-
-  bool result_type_decided = false;
 
   while (true) {
     // Attempt to read the first RecordBatch
-    arrow::Status status = reader_->ReadNext(&batch);
+    auto [batch_db, batch_orig_items] = read_batch();
 
-    if (!status.ok()) {
-      APSI_LOG_ERROR("Read csv error.");
-    }
-
-    if (batch == nullptr) {
-      // Handle end of file
+    if (batch_orig_items.empty()) {
       break;
     }
 
-    arrays_.clear();
+    row_cnt += batch_orig_items.size();
 
-    for (int i = 0; i < min(2, batch->num_columns()); i++) {
-      arrays_.emplace_back(
-          std::dynamic_pointer_cast<arrow::StringArray>(batch->column(i)));
-    }
+    for (size_t i = 0; i < batch_orig_items.size(); i++) {
+      orig_items.emplace_back(batch_orig_items[i]);
 
-    row_cnt += batch->num_rows();
-
-    if (!result_type_decided) {
-      result_type_decided = true;
-
-      if (batch->num_columns() >= 2) {
-        result = LabeledData{};
-      } else {
-        result = UnlabeledData{};
-      }
-    }
-
-    for (int i = 0; i < batch->num_rows(); i++) {
-      orig_items.emplace_back(arrays_[0]->Value(i));
-
-      if (holds_alternative<UnlabeledData>(result)) {
+      if (holds_alternative<UnlabeledData>(batch_db)) {
         get<UnlabeledData>(result).emplace_back(
-            std::string(arrays_[0]->Value(i)));
-      } else if (holds_alternative<LabeledData>(result)) {
-        Label label;
-        label.reserve(arrays_[1]->Value(i).size());
-        copy(arrays_[1]->Value(i).begin(), arrays_[1]->Value(i).end(),
-             back_inserter(label));
-
-        get<LabeledData>(result).emplace_back(std::string(arrays_[0]->Value(i)),
-                                              label);
+            get<UnlabeledData>(batch_db)[i]);
+      } else if (holds_alternative<LabeledData>(batch_db)) {
+        get<LabeledData>(result).emplace_back(get<LabeledData>(batch_db)[i]);
       } else {
         // Something is terribly wrong
         APSI_LOG_ERROR("Critical error reading data");
@@ -160,6 +142,54 @@ auto ApsiCsvReader::read() -> pair<DBData, vector<string>> {
                                         .size(),
                "source file {} has duplicated keys", file_name_);
   SPDLOG_INFO("Read csv file {}, row cnt is {}", file_name_, row_cnt);
+
+  return {std::move(result), std::move(orig_items)};
+}
+
+auto ApsiCsvReader::read_batch() -> pair<DBData, vector<string>> {
+  int row_cnt = 0;
+
+  DBData result;
+  vector<string> orig_items;
+  std::shared_ptr<arrow::RecordBatch> batch;
+
+  // Attempt to read the first RecordBatch
+  auto [keys, labels] = batch_provider_->ReadNextLabeledBatch();
+
+  if (keys.empty()) {
+    // Handle end of file
+    return {std::move(result), std::move(orig_items)};
+  }
+
+  row_cnt += keys.size();
+
+  if (!labels.empty()) {
+    result = LabeledData{};
+  } else {
+    result = UnlabeledData{};
+  }
+
+  for (size_t i = 0; i < keys.size(); i++) {
+    orig_items.emplace_back(keys[i]);
+
+    if (labels.empty()) {
+      get<UnlabeledData>(result).emplace_back(keys[i]);
+    } else if (holds_alternative<LabeledData>(result)) {
+      get<LabeledData>(result).emplace_back(
+          apsi::Item(keys[i]), apsi::Label(labels[i].begin(), labels[i].end()));
+    } else {
+      // Something is terribly wrong
+      APSI_LOG_ERROR("Critical error reading data");
+      throw runtime_error("variant is in bad state");
+    }
+  }
+
+  YACL_ENFORCE(row_cnt != 0, "empty file : {}", file_name_);
+  YACL_ENFORCE(orig_items.size() == std::unordered_set<std::string>(
+                                        orig_items.begin(), orig_items.end())
+                                        .size(),
+               "source file {} has duplicated keys", file_name_);
+  SPDLOG_INFO("Read csv file {}, batch row cnt is {}", file_name_, row_cnt);
 
   return {std::move(result), std::move(orig_items)};
 }

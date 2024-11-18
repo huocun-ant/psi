@@ -166,54 +166,120 @@ int RunReceiver(const ReceiverOptions &options,
 
   psi::apsi_wrapper::Receiver receiver(*params);
 
-  auto [query_data, orig_items] =
-      psi::apsi_wrapper::load_db_with_orig_items(options.query_file);
+  psi::apsi_wrapper::DBData db_data;
+  std::vector<std::string> orig_items;
 
-  if (!query_data ||
-      !holds_alternative<psi::apsi_wrapper::UnlabeledData>(*query_data)) {
-    // Failed to read query file
-    SPDLOG_ERROR("Failed to read query file: terminating");
-    return -1;
-  }
+  psi::apsi_wrapper::ApsiCsvReader reader(options.query_file,
+                                          options.query_batch_size);
+  bool append_to_outfile = false;
 
-  auto &items = get<psi::apsi_wrapper::UnlabeledData>(*query_data);
-
-  if (options.experimental_enable_bucketize) {
-    std::unordered_map<
-        size_t, std::pair<std::vector<::apsi::Item>, std::vector<std::string>>>
-        bucket_item_map;
-
-    for (size_t i = 0; i < orig_items.size(); i++) {
-      int bucket_idx = std::hash<std::string>()(orig_items[i]) %
-                       options.experimental_bucket_cnt;
-
-      if (bucket_item_map.find(bucket_idx) == bucket_item_map.end()) {
-        bucket_item_map[bucket_idx] = std::make_pair(
-            std::vector<::apsi::Item>(), std::vector<std::string>());
-      }
-
-      bucket_item_map[bucket_idx].first.emplace_back(items[i]);
-      bucket_item_map[bucket_idx].second.emplace_back(orig_items[i]);
+  while (true) {
+    tie(db_data, orig_items) = reader.read_batch();
+    if (orig_items.empty()) {
+      break;
     }
 
-    bool append_to_outfile = false;
-    size_t total_matches = 0;
+    if (!holds_alternative<psi::apsi_wrapper::UnlabeledData>(db_data)) {
+      // Failed to read query file
+      SPDLOG_ERROR("Failed to read query file: terminating");
+      return -1;
+    }
 
-    double total_time = 0;
-    for (const auto &pair : bucket_item_map) {
-      const size_t bucket_idx = pair.first;
-      const vector<::apsi::Item> &items_vec = pair.second.first;
-      auto bucket_start = std::chrono::high_resolution_clock::now();
-      SPDLOG_INFO("Start deal with bucket {}", bucket_idx);
+    auto &items = get<psi::apsi_wrapper::UnlabeledData>(db_data);
 
+    if (options.experimental_enable_bucketize) {
+      std::unordered_map<size_t, std::pair<std::vector<::apsi::Item>,
+                                           std::vector<std::string>>>
+          bucket_item_map;
+
+      for (size_t i = 0; i < orig_items.size(); i++) {
+        int bucket_idx = std::hash<std::string>()(orig_items[i]) %
+                         options.experimental_bucket_cnt;
+
+        if (bucket_item_map.find(bucket_idx) == bucket_item_map.end()) {
+          bucket_item_map[bucket_idx] = std::make_pair(
+              std::vector<::apsi::Item>(), std::vector<std::string>());
+        }
+
+        bucket_item_map[bucket_idx].first.emplace_back(items[i]);
+        bucket_item_map[bucket_idx].second.emplace_back(orig_items[i]);
+      }
+
+      size_t total_matches = 0;
+
+      double total_time = 0;
+      for (const auto &pair : bucket_item_map) {
+        const size_t bucket_idx = pair.first;
+        const vector<::apsi::Item> &items_vec = pair.second.first;
+        auto bucket_start = std::chrono::high_resolution_clock::now();
+        SPDLOG_INFO("Start deal with bucket {}", bucket_idx);
+
+        vector<::apsi::HashedItem> oprf_items;
+        vector<::apsi::LabelKey> label_keys;
+        try {
+          SPDLOG_INFO("Sending OPRF request for {} {}", items_vec.size(),
+                      " items ");
+          tie(oprf_items, label_keys) =
+              psi::apsi_wrapper::Receiver::RequestOPRF(items_vec, *channel,
+                                                       bucket_idx);
+          SPDLOG_INFO("Received OPRF response for {}  items", items_vec.size());
+        } catch (const exception &ex) {
+          SPDLOG_WARN("OPRF request failed: {}", ex.what());
+          return -1;
+        }
+
+        vector<::apsi::receiver::MatchRecord> query_result;
+        try {
+          SPDLOG_INFO("Sending APSI query");
+          query_result =
+              receiver.request_query(oprf_items, label_keys, *channel,
+                                     options.streaming_result, bucket_idx);
+          SPDLOG_INFO("Received APSI query response");
+        } catch (const exception &ex) {
+          SPDLOG_WARN("Failed sending APSI query: {}", ex.what());
+          return -1;
+        }
+
+        auto bucket_time =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::high_resolution_clock::now() - bucket_start)
+                .count();
+        total_time += bucket_time;
+        SPDLOG_INFO("End deal with bucket {}, time: {}ms", bucket_idx,
+                    bucket_time);
+
+        int cnt = psi::apsi_wrapper::print_intersection_results(
+            pair.second.second, items_vec, query_result, options.output_file,
+            append_to_outfile);
+
+        if (cnt > 0 && !append_to_outfile) {
+          append_to_outfile = true;
+        }
+
+        total_matches += cnt;
+      }
+
+      SPDLOG_INFO("Average bucket time: {}ms/bucket",
+                  total_time / bucket_item_map.size());
+
+      if (match_cnt != nullptr) {
+        *match_cnt = total_matches;
+      }
+
+      SPDLOG_INFO("Total matches {}  items.", total_matches);
+
+      print_transmitted_data(*channel);
+      print_timing_report(::apsi::util::recv_stopwatch);
+
+    } else {
+      vector<::apsi::Item> items_vec(items.begin(), items.end());
       vector<::apsi::HashedItem> oprf_items;
       vector<::apsi::LabelKey> label_keys;
       try {
-        SPDLOG_INFO("Sending OPRF request for {} {}", items_vec.size(),
-                    " items ");
-        tie(oprf_items, label_keys) = psi::apsi_wrapper::Receiver::RequestOPRF(
-            items_vec, *channel, bucket_idx);
-        SPDLOG_INFO("Received OPRF response for {}  items", items_vec.size());
+        SPDLOG_INFO("Sending OPRF request for {} items ", items_vec.size());
+        tie(oprf_items, label_keys) =
+            psi::apsi_wrapper::Receiver::RequestOPRF(items_vec, *channel);
+        SPDLOG_INFO("Received OPRF response for {} items", items_vec.size());
       } catch (const exception &ex) {
         SPDLOG_WARN("OPRF request failed: {}", ex.what());
         return -1;
@@ -222,80 +288,24 @@ int RunReceiver(const ReceiverOptions &options,
       vector<::apsi::receiver::MatchRecord> query_result;
       try {
         SPDLOG_INFO("Sending APSI query");
-        query_result =
-            receiver.request_query(oprf_items, label_keys, *channel,
-                                   options.streaming_result, bucket_idx);
+        query_result = receiver.request_query(oprf_items, label_keys, *channel,
+                                              options.streaming_result);
         SPDLOG_INFO("Received APSI query response");
       } catch (const exception &ex) {
         SPDLOG_WARN("Failed sending APSI query: {}", ex.what());
         return -1;
       }
 
-      auto bucket_time =
-          std::chrono::duration_cast<std::chrono::milliseconds>(
-              std::chrono::high_resolution_clock::now() - bucket_start)
-              .count();
-      total_time += bucket_time;
-      SPDLOG_INFO("End deal with bucket {}, time: {}ms", bucket_idx,
-                  bucket_time);
-
       int cnt = psi::apsi_wrapper::print_intersection_results(
-          pair.second.second, items_vec, query_result, options.output_file,
-          append_to_outfile);
+          orig_items, items_vec, query_result, options.output_file);
 
-      if (cnt > 0 && !append_to_outfile) {
-        append_to_outfile = true;
+      if (match_cnt != nullptr) {
+        *match_cnt = cnt;
       }
 
-      total_matches += cnt;
+      print_transmitted_data(*channel);
+      print_timing_report(::apsi::util::recv_stopwatch);
     }
-
-    SPDLOG_INFO("Average bucket time: {}ms/bucket",
-                total_time / bucket_item_map.size());
-
-    if (match_cnt != nullptr) {
-      *match_cnt = total_matches;
-    }
-
-    SPDLOG_INFO("Total matches {}  items.", total_matches);
-
-    print_transmitted_data(*channel);
-    print_timing_report(::apsi::util::recv_stopwatch);
-
-  } else {
-    vector<::apsi::Item> items_vec(items.begin(), items.end());
-    vector<::apsi::HashedItem> oprf_items;
-    vector<::apsi::LabelKey> label_keys;
-    try {
-      SPDLOG_INFO("Sending OPRF request for {} items ", items_vec.size());
-      tie(oprf_items, label_keys) =
-          psi::apsi_wrapper::Receiver::RequestOPRF(items_vec, *channel);
-      SPDLOG_INFO("Received OPRF response for {} items", items_vec.size());
-    } catch (const exception &ex) {
-      SPDLOG_WARN("OPRF request failed: {}", ex.what());
-      return -1;
-    }
-
-    vector<::apsi::receiver::MatchRecord> query_result;
-    try {
-      SPDLOG_INFO("Sending APSI query");
-      query_result = receiver.request_query(oprf_items, label_keys, *channel,
-                                            options.streaming_result);
-      SPDLOG_INFO("Received APSI query response");
-    } catch (const exception &ex) {
-      SPDLOG_WARN("Failed sending APSI query: {}", ex.what());
-      return -1;
-    }
-
-    int cnt = psi::apsi_wrapper::print_intersection_results(
-        orig_items, items_vec, query_result, options.output_file);
-
-    if (match_cnt != nullptr) {
-      *match_cnt = cnt;
-    }
-
-    print_transmitted_data(*channel);
-    print_timing_report(::apsi::util::recv_stopwatch);
   }
 
   // NOTE(junfeng): Yacl channel need to send a empty oprf request with max

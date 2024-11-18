@@ -91,8 +91,6 @@ class BucketRr22Core {
         broadcast_result_(broadcast_result),
         bucket_idx_(bucket_idx) {}
 
-  virtual ~BucketRr22Core() = default;
-
   virtual void Prepare(const std::shared_ptr<yacl::link::Context>& lctx) = 0;
   virtual void RunOprf(const std::shared_ptr<yacl::link::Context>& lctx) = 0;
   virtual void GetIntersection(

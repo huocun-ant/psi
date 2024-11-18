@@ -16,6 +16,7 @@
 
 #include <cassert>
 #include <filesystem>
+#include <unordered_set>
 
 #include "arrow/array.h"
 #include "arrow/compute/api.h"
@@ -23,6 +24,7 @@
 #include "spdlog/spdlog.h"
 #include "yacl/base/exception.h"
 
+#include "psi/utils/arrow_helper.h"
 #include "psi/utils/key.h"
 
 namespace psi {
@@ -100,7 +102,7 @@ void ArrowCsvBatchProvider::ReadNextBatch(
         read_keys->emplace_back(KeysJoin(values));
       }
 
-      if (read_labels) {
+      if (!labels_.empty()) {
         std::vector<absl::string_view> values;
         for (size_t i = keys_.size(); i < arrays_.size(); i++) {
           values.emplace_back(arrays_[i]->Value(idx_in_batch_));
@@ -119,24 +121,31 @@ void ArrowCsvBatchProvider::Init() {
 
   YACL_ENFORCE(!keys_.empty(), "You must provide keys.");
 
-  arrow::io::IOContext io_context = arrow::io::default_io_context();
-  infile_ =
-      arrow::io::ReadableFile::Open(file_path_, arrow::default_memory_pool())
-          .ValueOrDie();
+  auto columns = GetCsvColumnsNames(file_path_);
+  std::unordered_set<std::string> columns_set(columns.begin(), columns.end());
 
   auto read_options = arrow::csv::ReadOptions::Defaults();
   auto parse_options = arrow::csv::ParseOptions::Defaults();
   auto convert_options = arrow::csv::ConvertOptions::Defaults();
 
   for (const auto& key : keys_) {
+    YACL_ENFORCE(columns_set.find(key) != columns_set.end(),
+                 "Key column {} not found in csv file.", key);
     convert_options.column_types[key] = arrow::utf8();
   }
   for (const auto& label : labels_) {
+    YACL_ENFORCE(columns_set.find(label) != columns_set.end(),
+                 "label column {} not found in csv file.", label);
     convert_options.column_types[label] = arrow::utf8();
   }
+
   convert_options.include_columns = keys_;
   convert_options.include_columns.insert(convert_options.include_columns.end(),
                                          labels_.begin(), labels_.end());
+  auto io_context = arrow::io::default_io_context();
+  infile_ =
+      arrow::io::ReadableFile::Open(file_path_, arrow::default_memory_pool())
+          .ValueOrDie();
 
   reader_ = arrow::csv::StreamingReader::Make(io_context, infile_, read_options,
                                               parse_options, convert_options)

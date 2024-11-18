@@ -51,6 +51,7 @@ struct ReceiverOptions {
   // experimental bucketize
   bool experimental_enable_bucketize = false;
   size_t experimental_bucket_cnt;
+  size_t query_batch_size;
 };
 
 struct SenderOptions {

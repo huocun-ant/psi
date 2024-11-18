@@ -26,7 +26,6 @@
 #include <ios>
 #include <memory>
 #include <numeric>
-#include <sstream>
 #include <string>
 #include <tuple>
 #include <unordered_set>
@@ -478,15 +477,6 @@ void ResultDumper::Dump(const std::string& line, int64_t duplicate_cnt,
     while (duplicate_cnt-- >= 0) {
       *file << line << '\n';
     }
-  }
-}
-
-void ResultDumper::Flush() {
-  if (intersect_file_) {
-    intersect_file_->flush();
-  }
-  if (except_file_) {
-    except_file_->flush();
   }
 }
 

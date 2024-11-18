@@ -17,9 +17,9 @@ load("//bazel:psi.bzl", "psi_cc_library", "psi_cc_test")
 package(default_visibility = ["//visibility:public"])
 
 psi_cc_library(
-    name = "kw_pir",
-    srcs = ["kw_pir.cc"],
-    hdrs = ["kw_pir.h","index_pir.h"],
+    name = "kw_pir_client",
+    srcs = ["kw_pir_client.cc"],
+    hdrs = ["kw_pir_client.h"],
     linkopts = [
         "-ldl",
         "-lm",
@@ -27,17 +27,5 @@ psi_cc_library(
     deps = [
         "@yacl//yacl/base:byte_container_view",
         "@yacl//yacl/base:exception",
-        "@yacl//yacl/base:int128",
-        "@yacl//yacl/crypto/rand",
-        "//psi/utils:cuckoo_index",
-    ],
-)
-
-psi_cc_test(
-    name = "kw_pir_test",
-    srcs = ["kw_pir_test.cc"],
-    deps = [
-        ":kw_pir",
-        "//psi/sealpir:seal_pir",
     ],
 )
