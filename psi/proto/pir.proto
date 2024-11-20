@@ -45,7 +45,9 @@ message KeywordPirServerConfig {
 
   uint32 server_port = 4;
 
-  reserved 5, 9;
+  uint32 num_threads = 5;
+
+  reserved 6, 9;
 
   KeywordPirServerBackendConfig backend = 10;
 }
