@@ -331,6 +331,7 @@ psi_cc_library(
     srcs = ["arrow_csv_batch_provider.cc"],
     hdrs = ["arrow_csv_batch_provider.h"],
     deps = [
+        ":arrow_helper",
         ":batch_provider",
         ":key",
         "@org_apache_arrow//:arrow",

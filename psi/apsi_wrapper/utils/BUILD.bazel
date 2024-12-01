@@ -43,6 +43,7 @@ psi_cc_library(
     hdrs = ["csv_reader.h"],
     deps = [
         ":common",
+        "//psi/utils:arrow_csv_batch_provider",
         "//psi/utils:multiplex_disk_cache",
         "@org_apache_arrow//:arrow",
     ],
@@ -65,6 +66,7 @@ psi_cc_library(
         ":csv_reader",
         ":group_db_status_cc_proto",
         ":sender_db",
+        "//psi/kwpir/common:input_provider",
     ],
 )
 

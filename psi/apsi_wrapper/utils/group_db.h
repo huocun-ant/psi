@@ -25,6 +25,7 @@
 #include <vector>
 
 #include "psi/apsi_wrapper/utils/sender_db.h"
+#include "psi/kwpir/common/input_provider.h"
 
 #include "psi/apsi_wrapper/utils/group_db_status.pb.h"
 
@@ -76,6 +77,11 @@ class GroupDB {
     size_t cnt;
   };
 
+  GroupDB(std::shared_ptr<kwpir::InputProvider> provider,
+          const std::string& db_path, std::size_t group_cnt, size_t num_buckets,
+          uint32_t nonce_byte_count = 16, const std::string& params_file = "",
+          bool compress = false);
+
   GroupDB(const std::string& source_file, const std::string& db_path,
           std::size_t group_cnt, size_t num_buckets,
           uint32_t nonce_byte_count = 16, const std::string& params_file = "",
@@ -108,9 +114,15 @@ class GroupDB {
   ~GroupDB();
 
  private:
+  GroupDB(const std::string& db_path, std::size_t group_cnt, size_t num_buckets,
+          uint32_t nonce_byte_count = 16, const std::string& params_file = "",
+          bool compress = false);
+
   static inline const std::string status_file_name = "db.status";
 
   std::string source_file_;
+  std::shared_ptr<kwpir::InputProvider> provider_;
+
   std::string db_path_;
   size_t group_cnt_;
   size_t num_buckets_;

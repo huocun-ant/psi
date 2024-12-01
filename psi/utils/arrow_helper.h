@@ -20,6 +20,8 @@
 
 #include "arrow/csv/api.h"
 
+#include "psi/utils/arrow_helper.h"
+
 namespace psi {
 
 #define PSI_ARROW_GET_RESULT(value, maker)                                   \

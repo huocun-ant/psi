@@ -1,0 +1,134 @@
+//
+// Copyright 2022 Ant Group Co., Ltd.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT license.
+
+syntax = "proto3";
+
+package psi;
+
+// NOTE(junfeng): We provide a config identical to original APSI CLI.
+// Please check
+// https://github.com/microsoft/APSI?tab=readme-ov-file#command-line-interface-cli
+// for details.
+message ApsiSenderConfig {
+  // Number of threads to use
+  uint32 threads = 1;
+
+  // Log file path. For APSI only.
+  string log_file = 2;
+
+  // Do not write output to console. For APSI only.
+  bool silent = 3;
+
+  // One of 'all', 'debug', 'info' (default), 'warning', 'error', 'off'. For
+  // APSI only.
+  string log_level = 4;
+
+  // Path to a CSV file describing the sender's dataset (an item-label pair on
+  // each row) or a file containing a serialized SenderDB; the CLI will first
+  // attempt to load the data as a serialized SenderDB, and – upon failure –
+  // will proceed to attempt to read it as a CSV file
+  // For CSV File:
+  // 1. the first col is processed as item while the second col as label. OTHER
+  // COLS ARE IGNORED.
+  // 2. NO HEADERS ARE ALLOWED.
+  string db_file = 5;
+
+  // Path to a JSON file describing the parameters to be used by the sender.
+  // Not required if db_file points to a serialized SenderDB.
+  string params_file = 6;
+
+  // Save the SenderDB in the given file.
+  // Required if gen_db_only is set true.
+  // Use experimental_bucket_folder instead if you turn
+  // experimental_enable_bucketize on.
+  string sdb_out_file = 7;
+
+  // Number of bytes used for the nonce in labeled mode (default is 16)
+  uint32 nonce_byte_count = 8;
+
+  // Whether to compress the SenderDB in memory; this will make the memory
+  // footprint smaller at the cost of increased computation.
+  bool compress = 9;
+
+  // Whether to save sender db only.
+  bool save_db_only = 10;
+
+  // [experimental] Whether to split data in buckets and Each bucket would be a
+  // seperate SenderDB. If set, experimental_bucket_folder must be a valid
+  // folder.
+  bool experimental_enable_bucketize = 13;
+
+  // [experimental] The number of bucket to fit data.
+  uint32 experimental_bucket_cnt = 14;
+
+  // [experimental] Folder to save bucketized small csv files and db files.
+  string experimental_bucket_folder = 15;
+
+  // [experimental] The number of processes to use for generating db.
+  int32 experimental_db_generating_process_num = 16;
+
+  // Source file used to genenerate sender db.
+  // Currently only support csv file.
+  string source_file = 17;
+
+  // [experimental] The number of group of bucket, each group has a db_file,
+  // default 1024.
+  int32 experimental_bucket_group_cnt = 18;
+}
+
+message ApsiReceiverConfig {
+  // Number of threads to use
+  uint32 threads = 1;
+
+  // Log file path. For APSI only.
+  string log_file = 2;
+
+  // Do not write output to console. For APSI only.
+  bool silent = 3;
+
+  // One of 'all', 'debug', 'info' (default), 'warning', 'error', 'off'. For
+  // APSI only.
+  string log_level = 4;
+
+  // Path to a text file containing query data (one per line).
+  // Header is not needed.
+  string query_file = 5;
+
+  // Path to a file where intersection result will be written.
+  string output_file = 6;
+
+  // Path to a JSON file describing the parameters to be used by the sender.
+  // If not set, receiver will ask sender, which results in additional
+  // communication.
+  string params_file = 7;
+
+  // Must be same as sender config.
+  bool experimental_enable_bucketize = 8;
+
+  // Must be same as sender config.
+  uint32 experimental_bucket_cnt = 9;
+
+  // The number of query in a batch. default 1.
+  uint32 query_batch_size = 10;
+}
+
+// The report of pir task.
+message PirResultReport {
+  int64 match_cnt = 1;
+}
