@@ -66,6 +66,7 @@ use_repo(
 )
 
 new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
+
 new_local_repository(
     name = "macos_omp_x64",
     build_file = "@yacl//bazel:local_openmp_macos.BUILD",
