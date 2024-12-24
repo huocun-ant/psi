@@ -21,6 +21,7 @@
 
 #include "psi/legacy/bucket_psi.h"
 
+#include "psi/proto/apsi_wrapper.pb.h"
 #include "psi/proto/pir.pb.h"
 #include "psi/proto/psi.pb.h"
 #include "psi/proto/psi_v2.pb.h"

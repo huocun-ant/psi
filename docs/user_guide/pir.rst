@@ -45,7 +45,7 @@ The extra features brought are:
 
 If you want to try a similar CLI like APSI, you could compile the source code by
 
-.. code-block::
+.. code-block:: bash
 
     bazel build psi/wrapper/apsi/cli:receiver
 
@@ -55,7 +55,7 @@ If you want to try a similar CLI like APSI, you could compile the source code by
 And run CLI like
 
 
-.. code-block::
+.. code-block:: bash
 
     ./bazel-bin/psi/wrapper/apsi/cli/sender
 
@@ -73,7 +73,7 @@ CSV File
 
 1. The csv file should looks like
 
-.. code-block::
+.. code-block:: None
 
     key,value
     Yb,Ii
@@ -103,7 +103,7 @@ For senders: An APSI params file must be provided with CSV files. If a sender db
 For receivers: The APSI params file is optional. If not provided, receivers will ask for senders. If provided, please make sure receivers and senders share
 the same APSI params file, otherwise error occurred.
 
-It's not easy to find a suitable APSI params file. So APSI provides some examples at `APSI parameters <https://github.com/microsoft/APSI/tree/main/parameters`_.
+It's not easy to find a suitable APSI params file. So APSI provides some examples at `APSI parameters <https://github.com/microsoft/APSI/tree/main/parameters>`_.
 We have a copy at `APSI parameters <blob/main/examples/pir/apsi/parameters>` as well.
 
 To launch PIR, please check LaunchConfig at :doc:`/reference/launch_config` and fillin **runtime_config.pir_config**.
@@ -116,7 +116,7 @@ PIR Config
 Since version **0.4.0b0**, the source csv file for db generating should be specified as **source_file**, and **db_file** 
 is used to specify db file.
 
-.. code-block::
+.. code-block:: json
    :caption: apsi_sender_setup.json
 
     {
@@ -129,40 +129,7 @@ is used to specify db file.
 
 2. Sender: Online stage. In this stage, sender generates responses to receivers' queries. This stage is online.
 
-.. code-block::
-   :caption: apsi_sender_online.json
-
-    {
-        "apsi_sender_config": {
-            "db_file": "/tmp/sdb"
-        },
-        "link_config": {
-            "parties": [
-                {
-                    "id": "sender",
-                    "host": "127.0.0.1:5300"
-                },
-                {
-                    "id": "receiver",
-                    "host": "127.0.0.1:5400"
-                
-
-.. code-block::
-   :caption: apsi_sender_setup.json
-
-    {
-        "apsi_sender_config": {
-            "source_file": "/tmp/db.csv",
-            "params_file": "/tmp/1M-256-288.json",
-            "sdb_out_file": "/tmp/sdb",
-            "save_db_only": true
-        }
-    }
-
-
-2. Sender: Online stage. In this stage, sender generates responses to receivers' queries. This stage is online.
-
-.. code-block::
+.. code-block:: json
    :caption: apsi_sender_online.json
 
     {
@@ -186,7 +153,7 @@ is used to specify db file.
 
 3. Receiver: Online stage.
 
-.. code-block::
+.. code-block:: json
    :caption: apsi_receiver.json
 
     {

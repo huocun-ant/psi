@@ -53,6 +53,7 @@ DEFINE_bool(experimental_enable_bucketize, false,
             "Whether to split data in buckets and Each bucket would be a "
             "seperate SenderDB.");
 DEFINE_uint64(experimental_bucket_cnt, 0, "The number of bucket to fit data.");
+DEFINE_uint64(query_batch_size, 1, "The query batch size.");
 
 int main(int argc, char *argv[]) {
   psi::apsi_wrapper::cli::prepare_console();
@@ -76,6 +77,7 @@ int main(int argc, char *argv[]) {
   options.query_file = FLAGS_query_file;
   options.output_file = FLAGS_output_file;
   options.params_file = FLAGS_params_file;
+  options.query_batch_size = FLAGS_query_batch_size;
 
   options.experimental_enable_bucketize = FLAGS_experimental_enable_bucketize;
   options.experimental_bucket_cnt = FLAGS_experimental_bucket_cnt;

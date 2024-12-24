@@ -219,7 +219,7 @@ int print_intersection_results(
   }
 
   std::stringstream csv_output;
-  std::string csv_header = "key";
+  bool has_label = false;
   int match_cnt = 0;
   for (size_t i = 0; i < orig_items.size(); i++) {
     std::stringstream msg;
@@ -232,9 +232,9 @@ int print_intersection_results(
         msg << Colors::GreenBold << intersection[i].label.to_string()
             << Colors::Reset;
         csv_output << "," << intersection[i].label.to_string();
-        csv_header += ",value";
+        has_label = true;
       }
-      csv_output << endl;
+      csv_output << '\n';
       APSI_LOG_INFO(msg.str());
     } else {
       // msg << Colors::RedBold << orig_items[i] << Colors::Reset << " (NOT
@@ -248,7 +248,8 @@ int print_intersection_results(
       ofs << csv_output.str();
     } else {
       std::ofstream ofs(out_file);
-      ofs << csv_header << endl;
+
+      ofs << (has_label ? "key" : "key,label") << "\n";
       ofs << csv_output.str();
     }
 

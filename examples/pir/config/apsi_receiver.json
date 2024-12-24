@@ -4,7 +4,8 @@
     "query_file": "/tmp/query.csv",
     "output_file": "/tmp/result.csv",
     "params_file": "/tmp/100K-1-16.json",
-    "log_level": "info"
+    "log_level": "info",
+    "query_batch_size": 1
   },
   "link_config": {
     "parties": [

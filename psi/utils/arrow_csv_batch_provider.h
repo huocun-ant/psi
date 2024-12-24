@@ -45,6 +45,8 @@ class ArrowCsvBatchProvider : public IBasicBatchProvider,
 
   [[nodiscard]] size_t batch_size() const override { return batch_size_; }
 
+  bool HasLabel() const { return !labels_.empty(); }
+
  private:
   void Init();
 

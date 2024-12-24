@@ -13,8 +13,19 @@
 # limitations under the License.
 
 load("//bazel:psi.bzl", "psi_cc_library", "psi_cc_test")
+load(":copts.bzl", "spiral_copts")
 
 package(default_visibility = ["//visibility:public"])
+
+proto_library(
+    name = "serializable_proto",
+    srcs = ["serializable.proto"],
+)
+
+cc_proto_library(
+    name = "serializable_cc_proto",
+    deps = [":serializable_proto"],
+)
 
 psi_cc_library(
     name = "common",
@@ -64,15 +75,15 @@ psi_cc_library(
     name = "poly_matrix",
     srcs = ["poly_matrix.cc"],
     hdrs = ["poly_matrix.h"],
-    copts = ["-mavx2"],
+    copts = spiral_copts(),
     deps = [
         ":params",
+        ":serializable_cc_proto",
         ":util",
         "//psi/algorithm/spiral/arith:arith_params",
         "//psi/algorithm/spiral/arith:ntt",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/types:span",
-        "@yacl//yacl/base:aligned_vector",
         "@yacl//yacl/base:exception",
         "@yacl//yacl/base:int128",
         "@yacl//yacl/crypto/rand",
@@ -90,16 +101,16 @@ psi_cc_library(
     name = "poly_matrix_utils",
     srcs = ["poly_matrix_utils.cc"],
     hdrs = ["poly_matrix_utils.h"],
-    copts = ["-mavx2"],
+    copts = spiral_copts(),
     deps = [
-        "poly_matrix",
+        ":discrete_gaussian",
         ":params",
+        ":poly_matrix",
         ":util",
         "//psi/algorithm/spiral/arith:arith_params",
         "//psi/algorithm/spiral/arith:ntt",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/types:span",
-        "@yacl//yacl/base:aligned_vector",
         "@yacl//yacl/base:exception",
         "@yacl//yacl/base:int128",
         "@yacl//yacl/crypto/rand",
@@ -111,7 +122,7 @@ psi_cc_library(
 psi_cc_test(
     name = "poly_matrix_test",
     srcs = ["poly_matrix_test.cc"],
-    copts = ["-mavx2"],
+    copts = spiral_copts(),
     deps = [
         "poly_matrix",
         "poly_matrix_utils",
@@ -168,5 +179,123 @@ psi_cc_test(
         ":gadget",
         ":params",
         ":util",
+    ],
+)
+
+psi_cc_library(
+    name = "public_keys",
+    hdrs = ["public_keys.h"],
+    deps = [
+        ":params",
+        ":poly_matrix",
+        "@yacl//yacl/base:int128",
+    ],
+)
+
+psi_cc_library(
+    name = "spiral_client",
+    srcs = ["spiral_client.cc"],
+    hdrs = ["spiral_client.h"],
+    deps = [
+        ":common",
+        ":discrete_gaussian",
+        ":gadget",
+        ":params",
+        ":poly_matrix",
+        ":poly_matrix_utils",
+        ":public_keys",
+        "@yacl//yacl/base:int128",
+        "@yacl//yacl/crypto/rand",
+        "@yacl//yacl/crypto/tools:prg",
+        "@yacl//yacl/utils:elapsed_timer",
+        "@yacl//yacl/utils:parallel",
+    ],
+)
+
+psi_cc_test(
+    name = "spiral_client_test",
+    srcs = ["spiral_client_test.cc"],
+    deps = [
+        ":params",
+        ":poly_matrix_utils",
+        ":public_keys",
+        ":serialize",
+        ":spiral_client",
+        ":util",
+        "@abseil-cpp//absl/types:span",
+        "@yacl//yacl/crypto/tools:prg",
+    ],
+)
+
+psi_cc_library(
+    name = "spiral_server",
+    srcs = ["spiral_server.cc"],
+    hdrs = ["spiral_server.h"],
+    deps = [
+        ":common",
+        ":discrete_gaussian",
+        ":gadget",
+        ":params",
+        ":poly_matrix",
+        ":poly_matrix_utils",
+        ":public_keys",
+        ":spiral_client",
+        "@yacl//yacl/base:int128",
+        "@yacl//yacl/crypto/rand",
+        "@yacl//yacl/crypto/tools:prg",
+        "@yacl//yacl/utils:elapsed_timer",
+        "@yacl//yacl/utils:parallel",
+    ],
+)
+
+psi_cc_test(
+    name = "spiral_server_test",
+    srcs = ["spiral_server_test.cc"],
+    deps = [
+        ":gadget",
+        ":params",
+        ":poly_matrix_utils",
+        ":public_keys",
+        ":spiral_client",
+        ":spiral_server",
+        ":util",
+        "@abseil-cpp//absl/types:span",
+        "@yacl//yacl/crypto/tools:prg",
+    ],
+)
+
+psi_cc_test(
+    name = "spiral_pir_test",
+    srcs = ["spiral_pir_test.cc"],
+    deps = [
+        ":gadget",
+        ":params",
+        ":poly_matrix_utils",
+        ":public_keys",
+        ":serialize",
+        ":spiral_client",
+        ":spiral_server",
+        ":util",
+        "@abseil-cpp//absl/types:span",
+        "@yacl//yacl/crypto/tools:prg",
+        "@yacl//yacl/utils:elapsed_timer",
+    ],
+)
+
+psi_cc_library(
+    name = "serialize",
+    srcs = ["serialize.cc"],
+    hdrs = ["serialize.h"],
+    deps = [
+        ":common",
+        ":params",
+        ":poly_matrix",
+        ":serializable_cc_proto",
+        ":spiral_client",
+        ":spiral_server",
+        ":util",
+        "//psi/algorithm/spiral/arith:ntt_table",
+        "@abseil-cpp//absl/types:span",
+        "@yacl//yacl/base:buffer",
     ],
 )

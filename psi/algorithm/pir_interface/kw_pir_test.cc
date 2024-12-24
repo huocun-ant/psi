@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "psi/algorithm/kwpir/kw_pir.h"
+#include "psi/algorithm/pir_interface/kw_pir.h"
 
 #include <random>
 #include <utility>
@@ -23,7 +23,7 @@
 
 #include "psi/algorithm/sealpir/seal_pir.h"
 
-namespace psi::kwpir {
+namespace psi::pir {
 
 struct TestParams {
   uint64_t num_input = 1000;
@@ -76,8 +76,7 @@ TEST_P(KwpirTest, Works) {
   }
 
   psi::sealpir::SealPirOptions seal_options{params.N, params.NumBins(),
-                                            key_size + value_size,
-                                            params.ind_degree, params.d};
+                                            key_size + value_size, params.d};
   std::shared_ptr<psi::sealpir::IDbPlaintextStore> plaintext_store =
       std::make_shared<psi::sealpir::MemoryDbPlaintextStore>();
 
@@ -102,10 +101,9 @@ TEST_P(KwpirTest, Works) {
   yacl::ByteContainerView query_key = db_vec[ele_index].first;
   yacl::ByteContainerView query_value = db_vec[ele_index].second;
 
-  std::vector<uint64_t> offset_vec;
+  // std::vector<uint64_t> offset_vec;
   SPDLOG_INFO("generating query...\n");
-  std::vector<yacl::Buffer> query_vec =
-      client.GenerateQuery(query_key, offset_vec);
+  auto [query_vec, offset_vec] = client.GenerateQuery(query_key);
   SPDLOG_INFO("generating reply...\n");
   std::vector<yacl::Buffer> reply_vec = server.GenerateReply(query_vec);
   SPDLOG_INFO("decoding reply...\n");
@@ -152,4 +150,4 @@ INSTANTIATE_TEST_SUITE_P(
                     TestParams{(1 << 22) - (1 << 10), 3, 1.3, 16, 64, 128, 4096,
                                2, 0}));
 
-}  // namespace psi::kwpir
+}  // namespace psi::pir

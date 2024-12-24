@@ -34,6 +34,7 @@
 #include "arrow/csv/api.h"
 #include "arrow/io/api.h"
 
+#include "psi/utils/arrow_csv_batch_provider.h"
 #include "psi/utils/multiplex_disk_cache.h"
 #include "psi/wrapper/apsi/utils/common.h"
 
@@ -44,10 +45,14 @@ Simple CSV file parser
 */
 class ApsiCsvReader {
  public:
-  explicit ApsiCsvReader(const std::string& file_name);
+  explicit ApsiCsvReader(const std::string& file_name,
+                         size_t batch_size = 1 << 20);
 
   std::pair<DBData, std::vector<std::string>> read();
 
+  auto read_batch() -> std::pair<DBData, std::vector<std::string>>;
+
+  // TODO(huocun): delete these two function
   void bucketize(size_t bucket_cnt, const std::string& bucket_folder);
 
   void GroupBucketize(size_t bucket_cnt, const std::string& bucket_folder,
@@ -57,6 +62,10 @@ class ApsiCsvReader {
 
  private:
   std::string file_name_;
+
+  size_t batch_size_ = 1;
+
+  std::shared_ptr<ArrowCsvBatchProvider> batch_provider_;
 
   std::shared_ptr<arrow::csv::StreamingReader> reader_;
 

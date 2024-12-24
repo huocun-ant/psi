@@ -18,6 +18,7 @@
 #pragma once
 
 #include <cstddef>
+#include <memory>
 #include <utility>
 
 #include "apsi/query.h"
@@ -31,8 +32,18 @@ namespace psi::apsi_wrapper::api {
 
 class Sender {
  public:
+  // TODO(huocun): delete source_file option
   struct Option {
     std::string source_file;
+    std::string db_path;
+    size_t group_cnt = 1;
+    size_t num_buckets = 1;
+    uint32_t nonce_byte_count = 16;
+    bool compress = true;
+    std::string params_file;
+  };
+  struct KwPirOption {
+    std::shared_ptr<ArrowCsvBatchProvider> provider;
     std::string db_path;
     size_t group_cnt = 1;
     size_t num_buckets = 1;
@@ -45,9 +56,17 @@ class Sender {
   Sender(std::string db_path,
          size_t thread_count = std::thread::hardware_concurrency())
       : group_db_(db_path), thread_count_(thread_count) {}
+
   Sender(Option option,
          size_t thread_count = std::thread::hardware_concurrency())
       : group_db_(option.source_file, option.db_path, option.group_cnt,
+                  option.num_buckets, option.nonce_byte_count,
+                  option.params_file, option.compress),
+        thread_count_(thread_count) {}
+
+  Sender(KwPirOption option,
+         size_t thread_count = std::thread::hardware_concurrency())
+      : group_db_(option.provider, option.db_path, option.group_cnt,
                   option.num_buckets, option.nonce_byte_count,
                   option.params_file, option.compress),
         thread_count_(thread_count) {}

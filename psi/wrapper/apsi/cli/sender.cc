@@ -31,10 +31,13 @@ DEFINE_string(
 
 DEFINE_string(
     db_file, "examples/pir/apsi/data/db.csv",
-    "Path to a CSV file describing the sender's dataset (an item-label pair on "
-    "each row) or a file containing a serialized SenderDB; the CLI will first "
+    "A file containing a serialized SenderDB; the CLI will first "
     "attempt to load the data as a serialized SenderDB, and – upon failure – "
     "will proceed to attempt to read it as a CSV file");
+DEFINE_string(
+    source_file, "examples/pir/apsi/data/db.csv",
+    "Path to a CSV file describing the sender's dataset (an item-label pair on "
+    "each row)");
 DEFINE_string(
     params_file, "examples/pir/apsi/parameters/1M-256.json",
     "Path to a JSON file describing the parameters to be used by the sender");
@@ -67,6 +70,8 @@ DEFINE_bool(experimental_enable_bucketize, false,
             "Whether to split data in buckets and Each bucket would be a "
             "seperate SenderDB.");
 DEFINE_uint64(experimental_bucket_cnt, 0, "The number of bucket to fit data.");
+DEFINE_uint64(experimental_db_generating_process_num, 0,
+              "The number of process num to generate db.");
 DEFINE_string(experimental_bucket_folder, "",
               "Folder to save bucketized small csv files and db files.");
 
@@ -90,11 +95,14 @@ int main(int argc, char *argv[]) {
   options.channel = FLAGS_channel;
   options.streaming_result = FLAGS_streaming_result;
   options.db_file = FLAGS_db_file;
+  options.source_file = FLAGS_source_file;
   options.params_file = FLAGS_params_file;
   options.sdb_out_file = FLAGS_sdb_out_file;
 
   options.experimental_enable_bucketize = FLAGS_experimental_enable_bucketize;
   options.experimental_bucket_cnt = FLAGS_experimental_bucket_cnt;
+  options.experimental_db_generating_process_num =
+      FLAGS_experimental_db_generating_process_num;
   options.experimental_bucket_folder = FLAGS_experimental_bucket_folder;
 
   return psi::apsi_wrapper::cli::RunSender(options);

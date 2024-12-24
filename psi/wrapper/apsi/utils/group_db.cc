@@ -80,6 +80,39 @@ std::string PidFileName(pid_t pid) {
          fmt::format("apsi_process_{}", pid);
 }
 
+void GroupBucketize(std::shared_ptr<ArrowCsvBatchProvider> provider,
+                    size_t num_buckets, size_t group_cnt,
+                    MultiplexDiskCache& disk_cache) {
+  std::vector<std::unique_ptr<io::OutputStream>> bucket_group_vec;
+  disk_cache.CreateOutputStreams(group_cnt, &bucket_group_vec);
+  for (auto& out : bucket_group_vec) {
+    if (provider->HasLabel()) {
+      out->Write("bucket_id,key,value\n");
+    } else {
+      out->Write("bucket_id,key\n");
+    }
+  }
+
+  auto [keys, labels] = provider->ReadNextLabeledBatch();
+  auto per_group_bucket = (num_buckets + group_cnt - 1) / group_cnt;
+
+  while (!keys.empty()) {
+    for (size_t i = 0; i < keys.size(); ++i) {
+      auto key_hash = std::hash<std::string>()(keys[i]);
+      auto bucket_id = key_hash % num_buckets;
+      auto group_id = bucket_id / per_group_bucket;
+      auto& out = bucket_group_vec[group_id];
+      if (provider->HasLabel()) {
+        out->Write(
+            fmt::format("{},\"{}\",\"{}\"\n", bucket_id, keys[i], labels[i]));
+      } else {
+        out->Write(fmt::format("{},\"{}\"\n", bucket_id, keys[i]));
+      }
+    }
+    std::tie(keys, labels) = provider->ReadNextLabeledBatch();
+  }
+}
+
 }  // namespace
 
 // Based on testing, we found that multi-process processing is more
@@ -415,12 +448,28 @@ GroupDB::GroupDB(const std::string& db_path)
       apsi::PSIParams::Load(status_.params_file_content()));
 }
 
+GroupDB::GroupDB(std::shared_ptr<ArrowCsvBatchProvider> provider,
+                 const std::string& db_path, std::size_t group_cnt,
+                 size_t num_buckets, uint32_t nonce_byte_count,
+                 const std::string& params_file, bool compress)
+    : GroupDB(db_path, group_cnt, num_buckets, nonce_byte_count, params_file,
+              compress) {
+  provider_ = provider;
+}
+
 GroupDB::GroupDB(const std::string& source_file, const std::string& db_path,
                  std::size_t group_cnt, size_t num_buckets,
                  uint32_t nonce_byte_count, const std::string& params_file,
                  bool compress)
-    : source_file_(source_file),
-      db_path_(db_path),
+    : GroupDB(db_path, group_cnt, num_buckets, nonce_byte_count, params_file,
+              compress) {
+  source_file_ = source_file;
+}
+
+GroupDB::GroupDB(const std::string& db_path, std::size_t group_cnt,
+                 size_t num_buckets, uint32_t nonce_byte_count,
+                 const std::string& params_file, bool compress)
+    : db_path_(db_path),
       group_cnt_(group_cnt),
       num_buckets_(num_buckets),
       nonce_byte_count_(nonce_byte_count),
@@ -483,8 +532,12 @@ void GroupDB::DivideGroup() {
     std::filesystem::create_directories(db_path_);
   }
 
-  ApsiCsvReader reader(source_file_);
-  reader.GroupBucketize(num_buckets_, db_path_, group_cnt_, disk_cache_);
+  if (source_file_.empty()) {
+    GroupBucketize(provider_, num_buckets_, group_cnt_, disk_cache_);
+  } else {
+    ApsiCsvReader reader(source_file_);
+    reader.GroupBucketize(num_buckets_, db_path_, group_cnt_, disk_cache_);
+  }
 
   status_.set_state(GroupDBState::GROUP_DB_STATE_BUCKETED);
   SaveStatus(status_file_path_, status_);

@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "psi/algorithm/kwpir/kw_pir.h"
+#include "psi/algorithm/pir_interface/kw_pir.h"
 
 #include "yacl/crypto/hash/hash_utils.h"
 
-namespace psi::kwpir {
+namespace psi::pir {
 
 void KwPirServer::SetDatabase(
     const std::vector<
@@ -67,7 +67,7 @@ void KwPirServer::SetDatabase(
 }
 
 std::vector<yacl::Buffer> KwPirServer::GenerateReply(
-    const std::vector<yacl::Buffer>& query) {
+    const std::vector<yacl::Buffer>& query) const {
   uint64_t num_hash = options_.cuckoo_options_.num_hash;
   YACL_ENFORCE_EQ(query.size(), num_hash);
 
@@ -80,16 +80,17 @@ std::vector<yacl::Buffer> KwPirServer::GenerateReply(
   return reply_vec;
 }
 
-yacl::Buffer KwPirServer::GenerateReply(const yacl::Buffer& query) {
+yacl::Buffer KwPirServer::GenerateReply(const yacl::Buffer& query) const {
   yacl::Buffer reply = pir_server_->GenerateIndexReply(query);
   return reply;
 }
 
-std::vector<yacl::Buffer> KwPirClient::GenerateQuery(
-    yacl::ByteContainerView keyword, std::vector<uint64_t>& offset) {
+std::pair<std::vector<yacl::Buffer>, std::vector<uint64_t>>
+KwPirClient::GenerateQuery(yacl::ByteContainerView keyword) const {
   uint64_t num_hash = options_.cuckoo_options_.num_hash;
-  offset.clear();
-  offset.resize(num_hash);
+
+  std::vector<uint64_t> offset_vec;
+  offset_vec.reserve(num_hash);
 
   std::vector<yacl::Buffer> query_vec;
   query_vec.reserve(num_hash);
@@ -100,24 +101,24 @@ std::vector<yacl::Buffer> KwPirClient::GenerateQuery(
     uint64_t ele_index =
         hash_room.GetHash(hash_index) % options_.cuckoo_options_.NumBins();
 
-    yacl::Buffer query =
-        pir_client_->GenerateIndexQuery(ele_index, offset[hash_index]);
+    auto [query, offset] = pir_client_->GenerateIndexQuery(ele_index);
 
+    offset_vec.push_back(offset);
     query_vec.emplace_back(std::move(query));
   }
 
-  return query_vec;
+  return std::make_pair(query_vec, offset_vec);
 }
 
 std::vector<uint8_t> KwPirClient::DecodeReply(const yacl::Buffer& reply,
-                                              uint64_t offset) {
+                                              uint64_t offset) const {
   std::vector<uint8_t> ele = pir_client_->DecodeIndexReply(reply, offset);
   return ele;
 }
 
 std::vector<std::vector<uint8_t>> KwPirClient::DecodeReply(
     const std::vector<yacl::Buffer>& reply,
-    const std::vector<uint64_t>& offset) {
+    const std::vector<uint64_t>& offset) const {
   uint64_t num_hash = options_.cuckoo_options_.num_hash;
   YACL_ENFORCE_EQ(reply.size(), num_hash);
   YACL_ENFORCE_EQ(offset.size(), num_hash);
@@ -131,4 +132,4 @@ std::vector<std::vector<uint8_t>> KwPirClient::DecodeReply(
   }
   return ele_vec;
 }
-}  // namespace psi::kwpir
+}  // namespace psi::pir

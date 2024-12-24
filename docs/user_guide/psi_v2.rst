@@ -14,7 +14,7 @@ Please check details of configs at :doc:`/reference/psi_v2_config`.
 
 To launch PSI, please check LaunchConfig at :doc:`/reference/launch_config` and fillin **runtime_config.psi_config**.
 
-.. code-block::
+.. code-block:: json
    :caption: receiver.config
 
         {
@@ -64,7 +64,7 @@ To launch PSI, please check LaunchConfig at :doc:`/reference/launch_config` and 
         }
 
 
-.. code-block::
+.. code-block:: json
    :caption: sender.config
 
         {

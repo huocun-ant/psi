@@ -1,5 +1,4 @@
-//
-// Copyright 2022 Ant Group Co., Ltd.
+// Copyright 2024 Ant Group Co., Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,115 +13,142 @@
 // limitations under the License.
 //
 
-// Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.
-
 syntax = "proto3";
+
+import "psi/proto/common.proto";
 
 package psi;
 
-// NOTE(junfeng): We provide a config identical to original APSI CLI.
-// Please check
-// https://github.com/microsoft/APSI?tab=readme-ov-file#command-line-interface-cli
-// for details.
-message ApsiSenderConfig {
-  // Number of threads to use
-  uint32 threads = 1;
-
-  // Log file path. For APSI only.
-  string log_file = 2;
-
-  // Do not write output to console. For APSI only.
-  bool silent = 3;
-
-  // One of 'all', 'debug', 'info' (default), 'warning', 'error', 'off'. For
-  // APSI only.
-  string log_level = 4;
-
-  // Path to a CSV file describing the sender's dataset (an item-label pair on
-  // each row) or a file containing a serialized SenderDB; the CLI will first
-  // attempt to load the data as a serialized SenderDB, and – upon failure –
-  // will proceed to attempt to read it as a CSV file
-  // For CSV File:
-  // 1. the first col is processed as item while the second col as label. OTHER
-  // COLS ARE IGNORED.
-  // 2. NO HEADERS ARE ALLOWED.
-  string db_file = 5;
-
-  // Path to a JSON file describing the parameters to be used by the sender.
-  // Not required if db_file points to a serialized SenderDB.
-  string params_file = 6;
-
-  // Save the SenderDB in the given file.
-  // Required if gen_db_only is set true.
-  // Use experimental_bucket_folder instead if you turn
-  // experimental_enable_bucketize on.
-  string sdb_out_file = 7;
-
-  // Number of bytes used for the nonce in labeled mode (default is 16)
-  uint32 nonce_byte_count = 8;
-
-  // Whether to compress the SenderDB in memory; this will make the memory
-  // footprint smaller at the cost of increased computation.
-  bool compress = 9;
-
-  // Whether to save sender db only.
-  bool save_db_only = 10;
-
-  // [experimental] Whether to split data in buckets and Each bucket would be a
-  // seperate SenderDB. If set, experimental_bucket_folder must be a valid
-  // folder.
-  bool experimental_enable_bucketize = 13;
-
-  // [experimental] The number of bucket to fit data.
-  uint32 experimental_bucket_cnt = 14;
-
-  // [experimental] Folder to save bucketized small csv files and db files.
-  string experimental_bucket_folder = 15;
-
-  // [experimental] The number of processes to use for generating db.
-  int32 experimental_db_generating_process_num = 16;
-
-  // Source file used to genenerate sender db.
-  // Currently only support csv file.
-  string source_file = 17;
-
-  // [experimental] The number of group of bucket, each group has a db_file,
-  // default 1024.
-  int32 experimental_bucket_group_cnt = 18;
+enum PirBackend {
+  BACKEND_UNKNOWN = 0;
+  BACKEND_APSI = 1;
+  BACKEND_SEAL_PIR = 2;
+  BACKEND_KW_SEAL_PIR = 3;
 }
 
-message ApsiReceiverConfig {
-  // Number of threads to use
-  uint32 threads = 1;
+message AlgorithmConfig {
+  PirBackend backend_type = 1;
+  uint64 ind_degree = 2;
+  uint64 max_batch_query_size = 3;
+}
 
-  // Log file path. For APSI only.
-  string log_file = 2;
+message Schema {
+  repeated Field keys = 1;
+  repeated Field values = 2;
+}
 
-  // Do not write output to console. For APSI only.
-  bool silent = 3;
+message Field {
+  string name = 1;
+  DataType type = 2;
+}
 
-  // One of 'all', 'debug', 'info' (default), 'warning', 'error', 'off'. For
-  // APSI only.
-  string log_level = 4;
+message TlSConfig {
+  // Certificate file path
+  string certificate_path = 1;
 
-  // Path to a text file containing query data (one per line).
-  // Header is not needed.
-  string query_file = 5;
+  // Private key file path
+  string private_key_path = 2;
 
-  // Path to a file where intersection result will be written.
-  string output_file = 6;
+  // The trusted CA file to verify the peer's certificate
+  // If empty, use the system default CA files
+  string ca_file_path = 3;
+}
 
-  // Path to a JSON file describing the parameters to be used by the sender.
-  // If not set, receiver will ask sender, which results in additional
-  // communication.
-  string params_file = 7;
+message DataProxyLinkConfig {
+  string data_proxy_addr = 1;
 
-  // Must be same as sender config.
-  bool experimental_enable_bucketize = 8;
+  TlSConfig tls_config = 2;
+}
 
-  // Must be same as sender config.
-  uint32 experimental_bucket_cnt = 9;
+enum FileType {
+  FILE_TYPE_UNKNOWN = 0;
+  FILE_TYPE_CSV = 1;
+}
+
+message LocalFileConfig {
+  FileType file_type = 1;
+  string file_name = 2;
+}
+
+message DPDownLoadConfig {
+  DataProxyLinkConfig link_config = 1;
+
+  string domaindata_id = 2;
+
+  // specific the partition column and value, such as "dmdt=20240520"
+  string partition_spec = 3;
+}
+
+message DPUploadConfig {
+  DataProxyLinkConfig link_config = 1;
+
+  string domaindata_id = 2;
+
+  string relative_uri = 3;
+
+  string datasource_id = 4;
+}
+
+message InputTabelConfig {
+  Schema schema = 1;
+
+  oneof read_option {
+    DPDownLoadConfig dp_config = 4;
+    LocalFileConfig file_config = 5;
+  }
+}
+
+message PirPreprocessTaskConfig {
+  InputTabelConfig input = 1;
+
+  string db_path = 2;
+
+  DPUploadConfig db_upload_dst = 3;
+
+  AlgorithmConfig algorithm_config = 4;
+}
+
+message PirServerConfig {
+  string id = 1;
+
+  string host = 2;
+
+  uint32 server_port = 3;
+
+  uint32 num_threads = 4;
+
+  InputTabelConfig input = 5;
+
+  // if not specified, use /tmp/xxx
+  // if specified, and this path dir is not empty, will try to load from it
+  string db_path = 6;
+
+  // used for loading db file from dp
+  // if domaindata_id is not null, will download db from db
+  // and ignore input
+  DPDownLoadConfig db_download_config = 7;
+
+  reserved 8, 9;
+
+  AlgorithmConfig algorithm_config = 10;
+}
+
+message PirClientConfig {
+  string id = 1;
+  string host = 2;
+  uint32 port = 3;
+
+  string server_id = 4;
+  string server_address = 5;
+
+  // column name in response table to indicate whether the query is matched
+  // if not set, will use "is_match" as default
+  string is_match_col_name = 6;
+
+  reserved 7, 9;
+
+  // for check
+  AlgorithmConfig algorithm_config = 10;
 }
 
 // The report of pir task.

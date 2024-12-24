@@ -17,6 +17,42 @@ load("@rules_proto//proto:defs.bzl", "proto_library")
 package(default_visibility = ["//visibility:public"])
 
 proto_library(
+    name = "common_proto",
+    srcs = ["common.proto"],
+)
+
+cc_proto_library(
+    name = "common_cc_proto",
+    deps = [":common_proto"],
+)
+
+proto_library(
+    name = "pir_client_service_proto",
+    srcs = ["pir_client_service.proto"],
+    deps = [
+        ":common_proto",
+    ],
+)
+
+cc_proto_library(
+    name = "pir_client_service_cc_proto",
+    deps = [":pir_client_service_proto"],
+)
+
+proto_library(
+    name = "pir_server_service_proto",
+    srcs = ["pir_server_service.proto"],
+    deps = [
+        ":common_proto",
+    ],
+)
+
+cc_proto_library(
+    name = "pir_server_service_cc_proto",
+    deps = [":pir_server_service_proto"],
+)
+
+proto_library(
     name = "psi_proto",
     srcs = ["psi.proto"],
 )
@@ -27,13 +63,28 @@ cc_proto_library(
 )
 
 proto_library(
+    name = "apsi_wrapper_proto",
+    srcs = ["apsi_wrapper.proto"],
+)
+
+cc_proto_library(
+    name = "apsi_wrapper_cc_proto",
+    deps = [":apsi_wrapper_proto"],
+)
+
+proto_library(
     name = "pir_proto",
     srcs = ["pir.proto"],
+    deps = [
+        ":common_proto",
+    ],
 )
 
 cc_proto_library(
     name = "pir_cc_proto",
-    deps = [":pir_proto"],
+    deps = [
+        ":pir_proto",
+    ],
 )
 
 proto_library(
@@ -53,6 +104,7 @@ proto_library(
     name = "entry_proto",
     srcs = ["entry.proto"],
     deps = [
+        ":apsi_wrapper_proto",
         ":pir_proto",
         ":psi_proto",
         ":psi_v2_proto",

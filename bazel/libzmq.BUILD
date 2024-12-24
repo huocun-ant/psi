@@ -26,6 +26,8 @@ cmake(
     cache_entries = {
         "ZMQ_BUILD_TESTS": "OFF",
         "CMAKE_INSTALL_LIBDIR": "lib",
+        "WITH_LIBBSD": "ON",
+        "CMAKE_VERBOSE_MAKEFILE": "ON",
     },
     generate_args = ["-GNinja"],
     lib_source = "@com_github_zeromq_libzmq//:all",
